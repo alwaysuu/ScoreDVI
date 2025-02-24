@@ -122,6 +122,21 @@ class up(nn.Module):
         x = self.conv(x)
 
         return x
+    
+class up_noskip(nn.Module):
+    def __init__(self, in_ch, out_ch, kernel_size=3, padding=1, bilinear=True, norm='batchnorm'):
+        super(up_noskip, self).__init__()
+        if bilinear:
+            self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        else:
+            self.up = nn.ConvTranspose2d(in_ch//2, in_ch//2, 2, stride=2)
+        self.conv = double_conv(in_ch, out_ch, norm, kernel_size=kernel_size, padding=padding)
+        
+    def forward(self, x1):
+        x1 = self.up(x1)
+        x = self.conv(x1)
+
+        return x
 
 class up_conv(nn.Module):
     def __init__(self, in_ch, out_ch, bilinear=True, norm='batchnorm'):
@@ -151,19 +166,77 @@ class outconv(nn.Module):
 
 class UNet(nn.Module):
     def __init__(self, nIn=3, nOut=3, down_sample_norm='instancenorm', 
-                 up_sample_norm = 'batchnorm', need_sigmoid=False, kernel_size=3, padding=1, bilinear=True):
+                 up_sample_norm = 'batchnorm', need_sigmoid=False, kernel_size=3, padding=1, bilinear=True, chn_base=64, depth=4):
         super(UNet, self).__init__()
+        self.depth = depth
+        self.inc = inconv(nIn, chn_base, norm=down_sample_norm, kernel_size=kernel_size, padding=padding)
+        for i in range(self.depth):
+            setattr(self, 'down{}'.format(i),  
+                    down(chn_base * 2 ** i, chn_base * 2**(i+1) if i != self.depth -1 else chn_base*2**i, 
+                         norm=down_sample_norm, kernel_size=kernel_size, padding=padding))
+        for i in reversed(range(self.depth)):    
+            setattr(self, 'up{}'.format(i),  
+                    up(chn_base * 2 ** (i+1), chn_base*2**(i-1) if i != 0 else chn_base*2**i, 
+                         norm=up_sample_norm, kernel_size=kernel_size, padding=padding, bilinear=bilinear))
+        '''
+        self.down1 = down(chn_base, chn_base*2, norm=down_sample_norm, kernel_size=kernel_size, padding=padding)
+        self.down2 = down(chn_base*2, chn_base*4, norm=down_sample_norm, kernel_size=kernel_size, padding=padding)
+        self.down3 = down(chn_base*4, chn_base*8, norm=down_sample_norm, kernel_size=kernel_size, padding=padding)
+        self.down4 = down(chn_base*8, chn_base*8, norm=down_sample_norm, kernel_size=kernel_size, padding=padding)
+        self.up1 = up(chn_base*16, chn_base*4, norm=up_sample_norm, kernel_size=kernel_size, padding=padding, bilinear=bilinear)
+        self.up2 = up(chn_base*8, chn_base*2, norm=up_sample_norm, kernel_size=kernel_size, padding=padding, bilinear=bilinear)
+        self.up3 = up(chn_base*4, chn_base, norm=up_sample_norm, kernel_size=kernel_size, padding=padding, bilinear=bilinear)
+        self.up4 = up(chn_base*2, chn_base, norm=up_sample_norm, kernel_size=kernel_size, padding=padding, bilinear=bilinear)
+        '''
         
-        self.inc = inconv(nIn, 64, norm=down_sample_norm, kernel_size=kernel_size, padding=padding)
-        self.down1 = down(64, 128, norm=down_sample_norm, kernel_size=kernel_size, padding=padding)
-        self.down2 = down(128, 256, norm=down_sample_norm, kernel_size=kernel_size, padding=padding)
-        self.down3 = down(256, 512, norm=down_sample_norm, kernel_size=kernel_size, padding=padding)
-        self.down4 = down(512, 512, norm=down_sample_norm, kernel_size=kernel_size, padding=padding)
-        self.up1 = up(1024, 256, norm=up_sample_norm, kernel_size=kernel_size, padding=padding, bilinear=bilinear)
-        self.up2 = up(512, 128, norm=up_sample_norm, kernel_size=kernel_size, padding=padding, bilinear=bilinear)
-        self.up3 = up(256, 64, norm=up_sample_norm, kernel_size=kernel_size, padding=padding, bilinear=bilinear)
-        self.up4 = up(128, 64, norm=up_sample_norm, kernel_size=kernel_size, padding=padding, bilinear=bilinear)
-        self.outc = outconv(64, nOut)
+        self.outc = outconv(chn_base, nOut)
+        
+        self.need_sigmoid = need_sigmoid
+        
+    def forward(self, x):
+        x = self.inc(x)
+        shortcuts = [x]
+        for i in range(self.depth):
+            down = getattr(self, 'down{}'.format(i)) 
+            x = down(x)    
+            if i != self.depth - 1:   
+                shortcuts.append(x)
+        
+        for i in reversed(range(self.depth)):
+            up = getattr(self, 'up{}'.format(i)) 
+            x = up(x, shortcuts.pop())       
+        '''
+        self.x2 = self.down1(self.x1)
+        self.x3 = self.down2(self.x2)
+        self.x4 = self.down3(self.x3)
+        self.x5 = self.down4(self.x4)
+        self.x6 = self.up1(self.x5, self.x4)
+        self.x7 = self.up2(self.x6, self.x3)
+        self.x8 = self.up3(self.x7, self.x2)
+        self.x9 = self.up4(self.x8, self.x1)
+        '''
+        self.y = self.outc(x)
+        
+        if self.need_sigmoid:
+            self.y = torch.sigmoid(self.y)
+        
+        return self.y
+    
+class UNet_NoSkip(nn.Module):
+    def __init__(self, nIn=3, nOut=3, down_sample_norm='instancenorm', 
+                 up_sample_norm = 'batchnorm', need_sigmoid=False, kernel_size=3, padding=1, bilinear=True, chn_base=64):
+        super(UNet_NoSkip, self).__init__()
+        
+        self.inc = inconv(nIn, chn_base, norm=down_sample_norm, kernel_size=kernel_size, padding=padding)
+        self.down1 = down(chn_base, chn_base*2, norm=down_sample_norm, kernel_size=kernel_size, padding=padding)
+        self.down2 = down(chn_base*2, chn_base*4, norm=down_sample_norm, kernel_size=kernel_size, padding=padding)
+        self.down3 = down(chn_base*4, chn_base*8, norm=down_sample_norm, kernel_size=kernel_size, padding=padding)
+        self.down4 = down(chn_base*8, chn_base*8, norm=down_sample_norm, kernel_size=kernel_size, padding=padding)
+        self.up1 = up_noskip(chn_base*8, chn_base*8, norm=up_sample_norm, kernel_size=kernel_size, padding=padding, bilinear=bilinear)
+        self.up2 = up_noskip(chn_base*8, chn_base*4, norm=up_sample_norm, kernel_size=kernel_size, padding=padding, bilinear=bilinear)
+        self.up3 = up_noskip(chn_base*4, chn_base*2, norm=up_sample_norm, kernel_size=kernel_size, padding=padding, bilinear=bilinear)
+        self.up4 = up_noskip(chn_base*2, chn_base, norm=up_sample_norm, kernel_size=kernel_size, padding=padding, bilinear=bilinear)
+        self.outc = outconv(chn_base, nOut)
         
         self.need_sigmoid = need_sigmoid
         
@@ -173,10 +246,10 @@ class UNet(nn.Module):
         self.x3 = self.down2(self.x2)
         self.x4 = self.down3(self.x3)
         self.x5 = self.down4(self.x4)
-        self.x6 = self.up1(self.x5, self.x4)
-        self.x7 = self.up2(self.x6, self.x3)
-        self.x8 = self.up3(self.x7, self.x2)
-        self.x9 = self.up4(self.x8, self.x1)     
+        self.x6 = self.up1(self.x5)
+        self.x7 = self.up2(self.x6)
+        self.x8 = self.up3(self.x7)
+        self.x9 = self.up4(self.x8)     
         self.y = self.outc(self.x9)
         
         if self.need_sigmoid:
@@ -187,10 +260,10 @@ class UNet(nn.Module):
     
 class UNet_New(nn.Module):
     def __init__(self, nIn=3, nOut=3, down_sample_norm='instancenorm', 
-                 up_sample_norm='batchnorm', kernel_size=3, padding=1, need_sigmoid=False, bilinear=True):
+                 up_sample_norm='batchnorm', kernel_size=3, padding=1, need_sigmoid=False, bilinear=True, chn_base=64, depth=4):
         super(UNet_New, self).__init__()
         
-        self.net = UNet(nIn, nOut, down_sample_norm, up_sample_norm, need_sigmoid, kernel_size, padding, bilinear)
+        self.net = UNet(nIn, nOut, down_sample_norm, up_sample_norm, need_sigmoid, kernel_size, padding, bilinear, chn_base, depth)
         
     def forward(self, x):
         x = self.net(x)
