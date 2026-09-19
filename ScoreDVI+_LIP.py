@@ -8,6 +8,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = '2'
 import cv2
 import numpy as np
 import torch
+import torch.nn.functional as F
 import torchvision.transforms.functional as FT
 from PIL import Image
 from skimage.metrics import peak_signal_noise_ratio as compare_psnr
@@ -24,17 +25,20 @@ def float2uint(img):
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--testset', type=str, default='set5', choices=['Set14', 'set5'])
-parser.add_argument('--task', type=str, default='deblur', choices=['deblur', 'inpaint'])
+parser.add_argument('--testset', type=str, default='Set14', choices=['Set14', 'set5'])
+parser.add_argument('--task', type=str, default='md', choices=['deblur', 'inpaint', 'md'])
 parser.add_argument('--n_epoch', type=int, default=2000, help='number of epoch')
 opt, _ = parser.parse_known_args()
 
 if opt.task == 'deblur':
     kernel_size = 9; kernel_std = [20, 1]; noise_std = 0.02
+elif opt.task == 'md':
+    kernel_size = 61; intensity = 0.5; noise_std = 0.02
+    from motionblur.motionblur import Kernel
 elif opt.task == 'inpaint':
     mask_type = 'text'
 
-seed = 1314
+seed = 1315 # 1315 for md; 1314 for others
 random.seed(seed)
 np.random.seed(seed)
 torch.manual_seed(seed)
@@ -75,6 +79,17 @@ def Restoration(clean_im, total_step=400, task='deblur'):
     if task == 'deblur':
         GMM_num = 3
         noise_im_torch = FT.gaussian_blur(clean_im_torch, kernel_size, kernel_std) + torch.randn_like(clean_im_torch) * noise_std
+        
+        mean = noise_im_torch.clone().unsqueeze(0).repeat(1, GMM_num, 1, 1, 1).requires_grad_() 
+        log_var_ = torch.zeros(1, GMM_num, C, H, W, device='cuda').fill_(-3).requires_grad_()
+        
+    elif task == 'md':
+        GMM_num = 3
+        # kernel_md = Kernel(size=(kernel_size, kernel_size), intensity=intensity)
+        kernel_md = np.load('/home/cj/code/ScoreDVI/kernel_1320.npy')
+        kernel_md = torch.tensor(kernel_md, dtype=torch.float32).unsqueeze(0).unsqueeze(0).repeat(3, 1, 1, 1).cuda()
+        noise_im_torch = F.conv2d(clean_im_torch, kernel_md, stride=1, padding=kernel_size//2, groups=3) \
+                                           + torch.randn_like(clean_im_torch) * noise_std
         
         mean = noise_im_torch.clone().unsqueeze(0).repeat(1, GMM_num, 1, 1, 1).requires_grad_() 
         log_var_ = torch.zeros(1, GMM_num, C, H, W, device='cuda').fill_(-3).requires_grad_()
@@ -128,6 +143,13 @@ def Restoration(clean_im, total_step=400, task='deblur'):
             loss_rec = torch.sum(0.5 * (mean_convolve - noise_im_torch[:, None, ...]).pow(2) * output_pi, dim=1).mean()
             loss_rec += var.mean() * 0.5 # in practice, we found that setting |k|^2 to 1 results in good performance
             total_loss = loss_rec + 0.05*noise_std*kl_gauss # lam=0.05*noise_std
+            
+        elif task == 'md':
+            # eq 29
+            mean_convolve = F.conv2d(mean.squeeze(0), kernel_md, stride=1, padding=kernel_size//2, groups=3).unsqueeze(0)
+            loss_rec = torch.sum(0.5 * (mean_convolve - noise_im_torch[:, None, ...]).pow(2) * output_pi, dim=1).mean()
+            loss_rec += var.mean() * 0.5 # in practice, we found that setting |k|^2 to 1 results in good performance
+            total_loss = loss_rec + 0.05*noise_std*kl_gauss # lam=0.05*noise_std
         
         elif task == 'inpaint':
             # eq 30
@@ -158,6 +180,8 @@ if __name__ == "__main__":
     result_folder = '{}_{}'.format(opt.testset, opt.task)
     if opt.task == 'deblur':
         result_folder += '_k{}s{}n{}'.format(kernel_size, kernel_std, noise_std)
+    elif opt.task == 'md':
+        result_folder += 'k{}s{}n{}'.format(kernel_size, intensity, noise_std)
     elif opt.task == 'inpaint':
         result_folder += '_{}'.format(mask_type)
 
@@ -188,11 +212,11 @@ if __name__ == "__main__":
         psnrs.append(psnr)
         ssims.append(ssim)
         
-        # img_name = clean.split('/')[-1].split('.')[0] + '_restore'
-        # img_name_deg = clean.split('/')[-1].split('.')[0] + '_deg'
-        # noise_im = noise_im[:H, :W, :]
-        # Image.fromarray(denoised_im, mode='RGB').save(os.path.join(result_folder, img_name + '.' + clean.split('.')[-1]))
-        # Image.fromarray(float2uint(noise_im), mode='RGB').save(os.path.join(result_folder, img_name_deg + '.' + clean.split('.')[-1]))
+        img_name = clean.split('/')[-1].split('.')[0] + '_restore'
+        img_name_deg = clean.split('/')[-1].split('.')[0] + '_deg'
+        noise_im = noise_im[:H, :W, :]
+        Image.fromarray(denoised_im, mode='RGB').save(os.path.join(result_folder, img_name + '.' + clean.split('.')[-1]))
+        Image.fromarray(float2uint(noise_im), mode='RGB').save(os.path.join(result_folder, img_name_deg + '.' + clean.split('.')[-1]))
         
     mean_psnr = sum(psnrs)/len(psnrs)
     mean_ssim = sum(ssims)/len(ssims)
