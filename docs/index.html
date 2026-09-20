@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08141a">
+  <meta name="description" content="ScoreDVI+ uses implicit score priors to make variational inference practical for real-world image denoising and general image restoration.">
+  <meta property="og:title" content="ScoreDVI+ — Variational Inference with Implicit Score Priors">
+  <meta property="og:description" content="Flexible zero-shot restoration across photography, fluorescence microscopy, CT, deblurring, inpainting, HDR, and JPEG artifacts.">
+  <meta property="og:image" content="assets/sidd.jpg">
+  <meta property="og:type" content="website">
+  <title>ScoreDVI+ | Variational Inference with Implicit Score Priors</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="academic.css">
+</head>
+<body>
+  <div class="scroll-progress" aria-hidden="true"><span></span></div>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="ScoreDVI+ home"><span class="brand-mark">S+</span><span>ScoreDVI+</span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav"><span></span><span></span><span class="sr-only">Toggle navigation</span></button>
+    <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+      <a href="#abstract">Abstract</a><a href="#method">Method</a><a href="#results">Results</a><a href="#conclusion">Conclusion</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero section-shell">
+      <div class="hero-glow glow-one" aria-hidden="true"></div><div class="hero-glow glow-two" aria-hidden="true"></div>
+      <div class="hero-copy reveal">
+        <p class="eyebrow">ScoreDVI+ · Extended journal manuscript</p>
+        <h1>Variational Inference with Implicit Score Priors for Real-World Image Denoising and Beyond</h1>
+        <p class="hero-summary">A general variational inference framework that obtains implicit image priors from MMSE Gaussian denoisers for real-world denoising and image restoration.</p>
+        <div class="authors" aria-label="Authors">
+          <a href="mailto:jcheng24@hust.edu.cn">Jun Cheng</a><span>Tao Liu</span><span>Xuan Liu</span><a href="mailto:shantan@hust.edu.cn">Shan Tan<sup>✦</sup></a>
+        </div>
+        <p class="affiliation">School of Artificial Intelligence and Automation · Huazhong University of Science and Technology</p>
+      </div>
+      <aside class="hero-panel reveal" aria-label="Project highlights">
+        <div class="panel-label">At a glance</div>
+        <div class="stat-grid">
+          <div class="stat stat-featured"><span class="stat-value">35.95</span><span class="stat-label">average PSNR across five real-world benchmarks</span></div>
+          <div class="stat"><span class="stat-value">1</span><span class="stat-label">noisy image needed</span></div>
+          <div class="stat"><span class="stat-value">3</span><span class="stat-label">imaging modalities</span></div>
+          <div class="stat"><span class="stat-value">5+</span><span class="stat-label">restoration tasks</span></div>
+        </div>
+        <div class="panel-foot"><span class="pulse"></span>No explicit score network</div>
+      </aside>
+    </section>
+
+    <section id="abstract" class="abstract section-shell section-pad reveal" aria-labelledby="abstract-title">
+      <div class="section-index">Abstract</div>
+      <div class="abstract-grid">
+        <h2 id="abstract-title">Abstract</h2>
+        <div class="abstract-copy">
+          <p>Real-world image denoising is practical and crucial in low-level computer vision. Recent score-based generative models have shown effectiveness and promise in zero-shot image restoration. However, applying existing score-based restoration methods requires training explicit score networks on real-world images, and these methods are usually confined to predefined generation-oriented procedures, making them inefficient and inflexible. Moreover, existing methods generally assume white Gaussian noise and cannot handle real-world cases. To address these problems, this paper presents an implicit score priors-guided variational inference framework for flexible and effective real-world denoising.</p>
+          <p>The variational inference framework does not require an explicit image-prior density. Instead, we guide its optimization using implicit score priors obtained from samples of denoising variational Gaussian posteriors and readily available minimum mean squared error (MMSE) Gaussian denoisers. The proposed optimization uses implicit scores as regularization and supports adaptive inference without an explicit score network or a predefined sampling procedure.</p>
+          <p>Meanwhile, a non-i.i.d. Gaussian mixture likelihood model and hierarchical Bayesian inference dynamically model real-world noise during optimization. A score refinement strategy and a noise-aware prior assignment scheme further improve stability and performance. The framework is also extended to general image restoration, including linear and non-linear restoration tasks. Extensive experiments across diverse tasks and datasets demonstrate its effectiveness and generality.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="method" class="method section-shell section-pad" aria-labelledby="method-title">
+      <div class="section-index reveal">Method</div>
+      <div class="section-heading reveal">
+        <div><p class="kicker">Implicit score priors</p><h2 id="method-title">Variational optimization guided by MMSE denoisers</h2></div>
+        <p>Instead of learning an explicit score model, we query an MMSE Gaussian denoiser along the variational trajectory and use the resulting implicit score to optimize the posterior.</p>
+      </div>
+      <figure class="method-figure reveal">
+        <div class="method-frame"><img src="assets/method.jpg" alt="Variational optimization loop guided by implicit scores from a Gaussian denoiser" loading="lazy"></div>
+        <figcaption>Implicit scores connect samples from <i>q</i><sub>θ</sub>(x) to direct gradient-based updates of its mean and variance.</figcaption>
+      </figure>
+      <div class="method-steps">
+        <article class="step-card reveal"><span class="step-number">01</span><h3>Represent</h3><p>Construct a learnable Gaussian-mixture variational posterior over the clean image and a hierarchical posterior over real-world noise.</p></article>
+        <article class="step-card reveal"><span class="step-number">02</span><h3>Reveal</h3><p>Sample the current posterior and pass samples through MMSE Gaussian denoisers to extract image scores implicitly.</p></article>
+        <article class="step-card reveal"><span class="step-number">03</span><h3>Refine</h3><p>Use refined scores as regularization, then jointly optimize image and noise posteriors with noise-aware prior assignment.</p></article>
+      </div>
+    </section>
+
+    <section class="contributions section-pad"><div class="section-shell">
+      <div class="section-index reveal">Method details</div>
+      <div class="contribution-grid">
+        <div class="contribution-intro reveal"><p class="kicker">Key components</p><h2>Four components of ScoreDVI+</h2></div>
+        <article class="contribution-card reveal"><span>A</span><h3>Implicit score priors</h3><p>A general VI paradigm driven by scores derived from off-the-shelf MMSE Gaussian denoisers.</p></article>
+        <article class="contribution-card reveal"><span>B</span><h3>Real-world likelihood</h3><p>A non-i.i.d. GMM likelihood and hierarchical Bayesian inference adapt to structured, signal-dependent noise.</p></article>
+        <article class="contribution-card reveal"><span>C</span><h3>Stable optimization</h3><p>Score refinement and noise-aware prior assignment improve robustness without constraining the restoration procedure.</p></article>
+        <article class="contribution-card reveal"><span>D</span><h3>Beyond denoising</h3><p>The same framework handles linear and non-linear restoration, including blur, missing pixels, HDR, and JPEG artifacts.</p></article>
+      </div>
+    </div></section>
+
+    <section id="results" class="results section-shell section-pad" aria-labelledby="results-title">
+      <div class="section-index reveal">Experimental results</div>
+      <div class="section-heading results-heading reveal">
+        <div><p class="kicker">Qualitative and quantitative evaluation</p><h2 id="results-title">Experimental results</h2></div>
+        <p>We evaluate ScoreDVI+ on real-world denoising and on linear and non-linear image restoration problems.</p>
+      </div>
+
+      <section class="result-section" aria-labelledby="real-world-title">
+        <div class="result-section-head reveal"><span>01</span><div><h3 id="real-world-title">Real-world image denoising</h3><p>Photography images, fluorescence microscopy images, and low-dose CT images.</p></div></div>
+        <div class="gallery gallery-real-world">
+          <figure class="result-card result-wide reveal"><button class="image-button" type="button" data-image="assets/sidd.jpg" data-caption="Real-world smartphone denoising on SIDD-Val"><img src="assets/sidd.jpg" alt="SIDD denoising comparison among zero-shot methods" loading="lazy"><span class="zoom-hint">View full size</span></button><figcaption><span>SIDD</span> Real-world smartphone denoising</figcaption></figure>
+          <figure class="result-card reveal"><button class="image-button" type="button" data-image="assets/fmdd.jpg" data-caption="Fluorescence microscopy denoising on FMDD"><img src="assets/fmdd.jpg" alt="Fluorescence microscopy denoising comparison" loading="lazy"><span class="zoom-hint">View full size</span></button><figcaption><span>FMDD</span> Fluorescence microscopy denoising</figcaption></figure>
+          <figure class="result-card reveal"><button class="image-button" type="button" data-image="assets/ct.jpg" data-caption="Low-dose abdomen CT denoising"><img src="assets/ct.jpg" alt="Low-dose CT denoising comparison with lesion detail" loading="lazy"><span class="zoom-hint">View full size</span></button><figcaption><span>Mayo 2020</span> Low-dose CT denoising</figcaption></figure>
+        </div>
+      <div class="benchmark reveal" aria-labelledby="benchmark-title">
+        <div class="benchmark-intro"><p class="kicker">Zero-shot benchmark</p><h3 id="benchmark-title">Consistent across domains.</h3><p>ScoreDVI+ works from one noisy image and reaches the strongest average PSNR among the compared zero-shot methods across five real-world benchmarks.</p></div>
+        <div class="benchmark-table" role="table" aria-label="ScoreDVI plus benchmark results">
+          <div class="benchmark-row benchmark-head" role="row"><span role="columnheader">Dataset</span><span role="columnheader">PSNR</span><span role="columnheader">SSIM</span></div>
+          <div class="benchmark-row" role="row"><span role="cell">SIDD-Val</span><strong role="cell">35.26</strong><span role="cell">0.867</span></div>
+          <div class="benchmark-row" role="row"><span role="cell">SIDD-Bench</span><strong role="cell">36.01</strong><span role="cell">0.926</span></div>
+          <div class="benchmark-row" role="row"><span role="cell">FMDD</span><strong role="cell">33.16</strong><span role="cell">0.854</span></div>
+          <div class="benchmark-row" role="row"><span role="cell">PolyU</span><strong role="cell">38.14</strong><span role="cell">0.962</span></div>
+          <div class="benchmark-row" role="row"><span role="cell">CC</span><strong role="cell">37.19</strong><span role="cell">0.949</span></div>
+          <div class="benchmark-row benchmark-total" role="row"><span role="cell">Average</span><strong role="cell">35.95</strong><span role="cell">0.912</span></div>
+        </div>
+      </div>
+      </section>
+
+      <section class="result-section" aria-labelledby="linear-title">
+        <div class="result-section-head reveal"><span>02</span><div><h3 id="linear-title">Linear image restoration</h3><p>Image deblurring and inpainting with known forward operators.</p></div></div>
+        <div class="gallery gallery-linear">
+          <figure class="result-card reveal"><button class="image-button" type="button" data-image="assets/deblur.jpg" data-caption="Image deblurring with an anisotropic Gaussian kernel"><img src="assets/deblur.jpg" alt="Image deblurring comparison" loading="lazy"><span class="zoom-hint">View full size</span></button><figcaption><span>Set14</span> Anisotropic Gaussian deblurring</figcaption></figure>
+          <figure class="result-card reveal"><button class="image-button" type="button" data-image="assets/inpainting.jpg" data-caption="Text removal and image inpainting"><img src="assets/inpainting.jpg" alt="Image inpainting results" loading="lazy"><span class="zoom-hint">View full size</span></button><figcaption><span>Set14</span> Image inpainting</figcaption></figure>
+        </div>
+      </section>
+
+      <section class="result-section" aria-labelledby="nonlinear-title">
+        <div class="result-section-head reveal"><span>03</span><div><h3 id="nonlinear-title">Non-linear image restoration</h3><p>Restoration under HDR clipping and JPEG compression.</p></div></div>
+        <div class="gallery gallery-nonlinear">
+          <figure class="result-card reveal"><button class="image-button" type="button" data-image="assets/nonlinear.jpg" data-caption="Non-linear HDR and JPEG restoration"><img src="assets/nonlinear.jpg" alt="HDR and JPEG restoration results" loading="lazy"><span class="zoom-hint">View full size</span></button><figcaption><span>Set14</span> HDR and JPEG restoration</figcaption></figure>
+        </div>
+      </section>
+    </section>
+
+    <section id="conclusion" class="conclusion section-pad" aria-labelledby="conclusion-title"><div class="section-shell">
+      <div class="section-index reveal">Conclusion</div>
+      <div class="conclusion-grid reveal">
+        <h2 id="conclusion-title">Conclusion</h2>
+        <div>
+          <p>We propose ScoreDVI+, a variational inference method that uses implicit score priors from MMSE Gaussian denoisers for variational optimization and incorporates a non-i.i.d. Gaussian mixture likelihood for real-world image denoising. Score refinement and noise-aware prior assignment improve optimization stability and denoising performance. The score-based variational inference framework is further extended to linear and non-linear restoration tasks, including image deblurring, inpainting, HDR, and JPEG restoration. Across diverse tasks and benchmark datasets, ScoreDVI+ generally outperforms other zero-shot and dataset-based restoration methods.</p>
+          <p><strong>Limitations.</strong> ScoreDVI+ requires approximately 20 seconds to process a single noisy image and is therefore not yet suitable for real-time applications. For real-world degradations beyond noise, it also requires an accurate system matrix or forward operator. Future work will focus on computational efficiency and blind or semi-blind restoration, where the forward model is partially known or learned jointly with the image.</p>
+        </div>
+      </div>
+    </div></section>
+  </main>
+
+  <footer class="site-footer"><div><a class="brand footer-brand" href="#top"><span class="brand-mark">S+</span><span>ScoreDVI+</span></a><p>Implicit scores. Flexible inference. Real-world restoration.</p></div><div class="footer-meta"><p>Jun Cheng · HUST</p><p>Project page · <span id="year">2026</span></p></div></footer>
+  <dialog class="lightbox" id="lightbox" aria-label="Expanded result image"><button type="button" class="lightbox-close" aria-label="Close image">×</button><img src="" alt=""><p></p></dialog>
+  <script src="script.js"></script>
+</body>
+</html>
